@@ -1,5 +1,7 @@
 # Турнир на ставках
 
+[![Verify](https://github.com/Sonti22/betting-tournament/actions/workflows/ci.yml/badge.svg)](https://github.com/Sonti22/betting-tournament/actions/workflows/ci.yml)
+
 Сервис на NestJS, PostgreSQL и RabbitMQ. Получает `bet.settled` и `bet.rollback`, начисляет очки с конвертацией в USD и возвращает топ-100 вместе с местом указанного игрока. В комплекте — тестовый продюсер, миграции, Docker Compose и автоматические проверки.
 
 **Правило начисления:** `points = winAmount × курс валюты в USD`. Дробные очки сохраняются. Повторы не начисляют очки повторно, отмена окончательна и работает даже при доставке до расчёта. Все неоднозначности и причины выбора описаны в [DECISIONS.md](DECISIONS.md); правила изменения кода — в [AGENTS.md](AGENTS.md).
