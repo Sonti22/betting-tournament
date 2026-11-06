@@ -1,0 +1,73 @@
+name: betting-tournament
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: tournament
+      POSTGRES_PASSWORD: tournament
+      POSTGRES_DB: tournament
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tournament -d tournament"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  rabbitmq:
+    image: rabbitmq:4.1-management-alpine
+    hostname: tournament-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: tournament
+      RABBITMQ_DEFAULT_PASS: tournament
+    ports:
+      - "127.0.0.1:5673:5672"
+      - "127.0.0.1:15673:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build: .
+    init: true
+    environment: &app-environment
+      DATABASE_URL: postgresql://tournament:tournament@postgres:5432/tournament
+      RABBITMQ_URL: amqp://tournament:tournament@rabbitmq:5672
+      PORT: "3000"
+      FX_RATES: '${FX_RATES:-{"USD":"1","EUR":"1.10","GBP":"1.25"}}'
+      QUEUE_PREFIX: ${QUEUE_PREFIX:-tournament}
+      PREFETCH: ${PREFETCH:-16}
+      MAX_RETRIES: ${MAX_RETRIES:-5}
+      RETRY_DELAY_MS: ${RETRY_DELAY_MS:-1000}
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      postgres: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    stop_grace_period: 25s
+
+  producer:
+    build: .
+    init: true
+    profiles: ["tools"]
+    environment: *app-environment
+    entrypoint: ["node", "dist/scripts/produce.js"]
+    command: ["demo"]
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+
+volumes:
+  postgres-data:
+  rabbitmq-data:
